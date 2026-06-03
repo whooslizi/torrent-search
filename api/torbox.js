@@ -18,6 +18,7 @@ export default async function handler(req, res) {
     let result;
 
     switch (action) {
+      // ── Create torrent from magnet ──────────────────────────────
       case 'createTorrent': {
         const form = new FormData();
         form.append('magnet', params.magnet);
@@ -32,6 +33,7 @@ export default async function handler(req, res) {
         break;
       }
 
+      // ── Get torrent list (optionally a single torrent by id) ───
       case 'getTorrentList': {
         const url = new URL(`${TORBOX_BASE}/torrents/mylist`);
         if (params.id) url.searchParams.set('id', params.id);
@@ -54,7 +56,6 @@ export default async function handler(req, res) {
         if (!resp.ok) throw new Error(result.detail || result.error || `TorBox error ${resp.status}`);
         break;
       }
-
       case 'getUser': {
         const resp = await fetch(`${TORBOX_BASE}/user/me`, { headers });
         result = await resp.json();
