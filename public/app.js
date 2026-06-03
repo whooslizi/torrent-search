@@ -56,6 +56,10 @@
       base: 'https://debrid-link.com/api/v2',
       authHeader: (key) => ({ 'Authorization': `Bearer ${key}` }),
     },
+    torbox: {
+      name: 'TorBox',
+      base: '/api/torbox',
+    },
   };
 
   function getConfig() {
@@ -362,6 +366,9 @@
         case 'debridlink':
           directLinks = await processDebridLink(item, config.key);
           break;
+        case 'torbox':
+          directLinks = await processTorBox(item, config.key);
+          break;
         default:
           throw new Error('Unsupported debrid service');
       }
@@ -569,6 +576,83 @@
     return links;
   }
 
+  async function processTorBox(item, key) {
+    const proxy = '/api/torbox';
+
+    async function tbPost(action, params = {}) {
+      const res = await fetch(proxy, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, key, ...params }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `TorBox error (${res.status})`);
+      return data;
+    }
+
+    // Step 1: Create torrent from magnet
+    setStepState('magnet', 'active', 'Adding...');
+    const createData = await tbPost('createTorrent', { magnet: item.magnet });
+    const torrentId = createData.data?.torrent_id;
+    if (!torrentId) throw new Error('No torrent ID received from TorBox');
+    setStepState('magnet', 'done', 'Added ✓');
+
+    setStepState('select', 'done', 'Auto-selected ✓');
+
+    // Step 2: Wait for torrent to finish
+    setStepState('wait', 'active', 'Waiting for cache...');
+    let torrent;
+    for (let i = 0; i < 60; i++) {
+      const listData = await tbPost('getTorrentList', { id: torrentId });
+      torrent = listData.data;
+      // When querying by id, data is the single torrent object
+      if (!torrent) throw new Error('Torrent not found');
+
+      const status = torrent.download_state;
+      if (status === 'completed' || status === 'cached' || status === 'uploading') break;
+      if (status === 'error' || status === 'dead') throw new Error(`Torrent ${status}`);
+
+      const progress = torrent.progress
+        ? `${Math.round(torrent.progress * 100)}%`
+        : (torrent.download_state || 'Processing...');
+      setStepState('wait', 'active', progress);
+      await sleep(2000);
+    }
+    if (!torrent || !['completed', 'cached', 'uploading'].includes(torrent.download_state)) {
+      throw new Error('Timed out waiting for TorBox download');
+    }
+    setStepState('wait', 'done', 'Ready ✓');
+
+    // Step 3: Request download links for each file
+    setStepState('unrestrict', 'active', 'Generating links...');
+    const files = torrent.files || [];
+    const links = [];
+
+    if (files.length === 0) {
+      // Single-file torrent – request with file_id 0
+      const dlData = await tbPost('requestDl', { torrent_id: torrentId, file_id: 0 });
+      if (dlData.data) {
+        links.push({ filename: torrent.name || 'File', url: dlData.data, size: torrent.size || 0 });
+      }
+    } else {
+      for (const file of files) {
+        try {
+          const dlData = await tbPost('requestDl', { torrent_id: torrentId, file_id: file.id });
+          if (dlData.data) {
+            links.push({
+              filename: file.short_name || file.name || 'File',
+              url: dlData.data,
+              size: file.size || 0,
+            });
+          }
+        } catch { /* skip files that fail */ }
+      }
+    }
+
+    setStepState('unrestrict', 'done', `${links.length} link(s) ready ✓`);
+    return links;
+  }
+
   function showDebridLinks(links, mode) {
     const container = $('#debrid-links');
     container.innerHTML = '<h3>🎉 Stream Links Ready</h3>';
@@ -687,6 +771,17 @@
           const pmData = await res.json();
           toast(`Connected! Customer #${pmData.customer_id || 'unknown'}`, 'success');
           break;
+        case 'torbox': {
+          const tbRes = await fetch('/api/torbox', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getUser', key }),
+          });
+          if (!tbRes.ok) throw new Error('Invalid key');
+          const tbData = await tbRes.json();
+          toast(`Connected! Welcome, ${tbData.data?.email || 'TorBox user'}`, 'success');
+          break;
+        }
         default:
           toast('Test not available for this service yet', 'info');
           break;
