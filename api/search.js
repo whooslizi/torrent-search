@@ -71,12 +71,34 @@ export default async function handler(req, res) {
       ? parsed.rss.channel.item
       : [parsed.rss.channel.item];
 
-    const results = items.map((item) => {
-      const magnetLink = item.link || '';
-      const infoHashMatch = magnetLink.match(/btih:([a-fA-F0-9]{40})/i)
-        || (item.guid && typeof item.guid === 'string' ? item.guid.match(/btih:([a-fA-F0-9]{40})/i) : null);
-      const infoHash = infoHashMatch ? infoHashMatch[1].toLowerCase() : '';
+    const TRACKERS = [
+      'http://nyaa.tracker.wf:7777/announce',
+      'udp://open.stealth.si:80/announce',
+      'udp://tracker.opentrackr.org:1337/announce',
+      'udp://exodus.desync.com:6969/announce',
+      'udp://tracker.torrent.eu.org:451/announce',
+    ];
 
+    const results = items.map((item) => {
+      const torrentUrl = item.link || '';
+
+      // Extract info hash from nyaa:infoHash (preferred) or fallback to parsing link/guid
+      let infoHash = '';
+      if (item['nyaa:infoHash']) {
+        infoHash = String(item['nyaa:infoHash']).toLowerCase();
+      } else {
+        const hashMatch = torrentUrl.match(/btih:([a-fA-F0-9]{40})/i)
+          || (item.guid && typeof item.guid === 'string' ? item.guid.match(/btih:([a-fA-F0-9]{40})/i) : null);
+        if (hashMatch) infoHash = hashMatch[1].toLowerCase();
+      }
+
+      // Build a proper magnet URI from the info hash
+      const title = item.title || 'Unknown';
+      let magnet = torrentUrl; // fallback to .torrent URL
+      if (infoHash) {
+        const trackerParams = TRACKERS.map(t => `&tr=${encodeURIComponent(t)}`).join('');
+        magnet = `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(title)}${trackerParams}`;
+      }
 
       const guidStr = item.guid?.['#text'] || item.guid || '';
       const idMatch = String(guidStr).match(/(\d+)$/);
@@ -84,8 +106,9 @@ export default async function handler(req, res) {
 
       return {
         id,
-        title: item.title || 'Unknown',
-        magnet: magnetLink,
+        title,
+        magnet,
+        torrentUrl,
         size: item['nyaa:size'] || 'Unknown',
         sizeBytes: parseSizeToBytes(item['nyaa:size'] || ''),
         date: item.pubDate || '',
