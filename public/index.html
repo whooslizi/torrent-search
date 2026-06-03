@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Search and stream anime torrents with debrid integration. Open in VLC, Stremio, or Nuvio.">
+  <title>Anime Lookup — Torrent Search + Stream</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="bg-glow bg-glow--1"></div>
+  <div class="bg-glow bg-glow--2"></div>
+  <div class="bg-glow bg-glow--3"></div>
+
+  <!-- Login / Setup Screen -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="login-logo-icon">⛩️</span>
+        <h1>Anime<span class="logo-accent">Lookup</span></h1>
+        <p class="login-subtitle">Search anime torrents from Nyaa.si — stream via debrid</p>
+      </div>
+
+      <div class="login-privacy">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>I will <strong>never</strong> collect, store, or access your API key at any point. Everything stays in your browser.</span>
+      </div>
+
+      <div class="login-form">
+        <div class="form-field">
+          <label for="login-service">Debrid Service</label>
+          <select id="login-service">
+            <option value="realdebrid">Real-Debrid</option>
+            <option value="alldebrid">AllDebrid</option>
+            <option value="premiumize">Premiumize</option>
+            <option value="debridlink">Debrid-Link</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="login-api-key">API Key</label>
+          <div class="input-group">
+            <input type="password" id="login-api-key" placeholder="Paste your debrid API key">
+            <button id="btn-login-paste" class="btn btn--outline" title="Paste from clipboard">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              Paste
+            </button>
+          </div>
+        </div>
+        <button id="btn-login-submit" class="btn btn--primary btn--lg btn--full">
+          Connect & Enter
+        </button>
+        <div class="login-divider">
+          <span>or</span>
+        </div>
+        <button id="btn-login-skip" class="btn btn--ghost btn--full">
+          Continue without login — search only
+        </button>
+      </div>
+
+      <p class="login-note">You can always add your key later from the settings menu.</p>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header id="app-header" class="hidden">
+    <div class="header-inner">
+      <div class="logo" id="logo">
+        <span class="logo-icon">⛩️</span>
+        <h1>Anime<span class="logo-accent">Lookup</span></h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-debrid-settings" class="btn btn--ghost" title="Debrid Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="btn-label">Settings</span>
+          <span id="debrid-status-dot" class="status-dot status-dot--inactive"></span>
+        </button>
+        <button id="btn-logout" class="btn btn--ghost btn--danger" title="Logout">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span class="btn-label">Logout</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="app-main" class="hidden">
+    <section id="search-section">
+      <div class="search-hero">
+        <p class="search-tagline">Search anime torrents from Nyaa.si — stream via debrid</p>
+      </div>
+      <form id="search-form" autocomplete="off">
+        <div class="search-bar" id="search-bar">
+          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="Search anime... e.g. Frieren, One Piece, Dandadan">
+          <button type="submit" id="search-submit" class="btn btn--primary">
+            <span>Search</span>
+          </button>
+        </div>
+        <div class="search-filters">
+          <div class="filter-group">
+            <label for="filter-category">Category</label>
+            <select id="filter-category">
+              <option value="0_0">All Categories</option>
+              <option value="1_0" selected>Anime - All</option>
+              <option value="1_2">Anime - English</option>
+              <option value="1_3">Anime - Non-English</option>
+              <option value="1_4">Anime - Raw</option>
+              <option value="1_1">Anime - AMV</option>
+              <option value="3_0">Music - All</option>
+              <option value="3_1">Music - Lossless</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filter-quality">Filter</label>
+            <select id="filter-quality">
+              <option value="0">No Filter</option>
+              <option value="1">No Remakes</option>
+              <option value="2">Trusted Only</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filter-sort">Sort By</label>
+            <select id="filter-sort">
+              <option value="">Date (Default)</option>
+              <option value="seeders">Seeders</option>
+              <option value="leechers">Leechers</option>
+              <option value="size">Size</option>
+              <option value="downloads">Downloads</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filter-order">Order</label>
+            <select id="filter-order">
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section id="results-section" class="hidden">
+      <div class="results-header">
+        <h2 id="results-title">Results</h2>
+        <span id="results-count" class="results-count"></span>
+      </div>
+      <div id="results-grid" class="results-grid"></div>
+      <div id="pagination" class="pagination hidden"></div>
+    </section>
+
+    <section id="loading-section" class="hidden">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Searching Nyaa.si...</p>
+      </div>
+    </section>
+
+    <section id="empty-section" class="hidden">
+      <div class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <h3>No results found</h3>
+        <p>Try different keywords or adjust your filters</p>
+      </div>
+    </section>
+
+    <section id="error-section" class="hidden">
+      <div class="error-state">
+        <span class="error-icon">⚠️</span>
+        <h3 id="error-title">Something went wrong</h3>
+        <p id="error-message">Please try again later.</p>
+        <button id="btn-retry" class="btn btn--primary">Retry</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Debrid Settings Modal -->
+  <div id="debrid-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Debrid Settings</h2>
+        <button id="btn-close-modal" class="btn btn--icon" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">I will <strong>never</strong> collect, store, or access your API key. It stays in your browser's local storage only.</p>
+        <div class="form-field">
+          <label for="settings-service">Debrid Service</label>
+          <select id="settings-service">
+            <option value="realdebrid">Real-Debrid</option>
+            <option value="alldebrid">AllDebrid</option>
+            <option value="premiumize">Premiumize</option>
+            <option value="debridlink">Debrid-Link</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="debrid-api-key">API Key</label>
+          <div class="input-group">
+            <input type="password" id="debrid-api-key" placeholder="Paste your debrid API key">
+            <button id="btn-paste-key" class="btn btn--outline" title="Paste from clipboard">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              Paste
+            </button>
+          </div>
+        </div>
+        <div class="form-field">
+          <div class="key-status" id="key-status">
+            <span class="status-dot status-dot--inactive"></span>
+            <span>No API key configured</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-save-key" class="btn btn--primary">Save Key</button>
+          <button id="btn-clear-key" class="btn btn--ghost btn--danger">Clear Key</button>
+          <button id="btn-test-key" class="btn btn--outline">Test Connection</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debrid Progress Modal -->
+  <div id="debrid-progress-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-content--compact">
+      <div class="modal-header">
+        <h2>Processing with Debrid</h2>
+        <button id="btn-close-progress" class="btn btn--icon" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="progress-steps" id="progress-steps">
+          <div class="progress-step" data-step="magnet">
+            <div class="step-indicator"><span class="step-num">1</span></div>
+            <div class="step-info">
+              <span class="step-label">Adding magnet</span>
+              <span class="step-status"></span>
+            </div>
+          </div>
+          <div class="progress-step" data-step="select">
+            <div class="step-indicator"><span class="step-num">2</span></div>
+            <div class="step-info">
+              <span class="step-label">Selecting files</span>
+              <span class="step-status"></span>
+            </div>
+          </div>
+          <div class="progress-step" data-step="wait">
+            <div class="step-indicator"><span class="step-num">3</span></div>
+            <div class="step-info">
+              <span class="step-label">Waiting for download</span>
+              <span class="step-status"></span>
+            </div>
+          </div>
+          <div class="progress-step" data-step="unrestrict">
+            <div class="step-indicator"><span class="step-num">4</span></div>
+            <div class="step-info">
+              <span class="step-label">Generating stream links</span>
+              <span class="step-status"></span>
+            </div>
+          </div>
+        </div>
+        <div id="debrid-links" class="debrid-links hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

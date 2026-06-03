@@ -1,0 +1,10 @@
+{
+  "name": "anime-lookup",
+  "version": "1.0.0",
+  "description": "Torrent search + debrid streaming app",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0"
+  }
+}
