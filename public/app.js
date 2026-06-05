@@ -25,6 +25,9 @@
   const btnSaveKey = $('#btn-save-key');
   const btnPasteKey = $('#btn-paste-key');
   const keyStatusText = $('#key-status-text');
+  const settingsModal = $('#settings-modal');
+  const btnOpenSettings = $('#btn-open-settings');
+  const btnCloseSettings = $('#btn-close-settings');
   const toastContainer = $('#toast-container');
 
   let currentQuery = '';
@@ -83,6 +86,8 @@
       loginApiKey.value = config.key;
       isLoggedIn = true;
       updateDebridStatus();
+    } else {
+      if (settingsModal) settingsModal.classList.remove('hidden');
     }
     bindEvents();
     searchInput.focus();
@@ -120,8 +125,14 @@
           });
           const data = await res.json();
           isValid = res.ok && data.success !== false;
+          if (isValid && data.data && data.data.email) {
+            localStorage.setItem('debrid_account', data.data.email);
+          } else {
+            localStorage.removeItem('debrid_account');
+          }
         } else {
           isValid = true;
+          localStorage.removeItem('debrid_account');
         }
 
         if (!isValid) throw new Error('Invalid API key');
@@ -130,6 +141,7 @@
         isLoggedIn = true;
         updateDebridStatus();
         toast(`Connected to ${DEBRID_SERVICES[service].name}!`, 'success');
+        if (settingsModal) setTimeout(() => settingsModal.classList.add('hidden'), 500);
       } catch (err) {
         keyStatusText.textContent = 'Invalid API key';
         keyStatusText.style.color = 'var(--danger)';
@@ -138,6 +150,10 @@
         btnSaveKey.disabled = false;
       }
     });
+
+    if (btnOpenSettings) btnOpenSettings.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+    if (btnCloseSettings) btnCloseSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+    if (settingsModal) settingsModal.querySelector('.modal-backdrop').addEventListener('click', () => settingsModal.classList.add('hidden'));
 
     searchForm.addEventListener('submit', handleSearch);
 
@@ -710,9 +726,14 @@
     const config = getConfig();
     const hasKey = !!(config.service && config.key);
     const serviceName = hasKey ? DEBRID_SERVICES[config.service]?.name : '';
-    keyStatusText.textContent = hasKey
-      ? `Connected to ${serviceName}`
-      : 'No API key configured';
+    const account = localStorage.getItem('debrid_account');
+    
+    let text = 'No API key configured';
+    if (hasKey) {
+      text = account ? `Connected to ${serviceName} (${account})` : `Connected to ${serviceName}`;
+    }
+    
+    keyStatusText.textContent = text;
     keyStatusText.style.color = hasKey ? 'var(--success)' : 'var(--text-muted)';
   }
 
