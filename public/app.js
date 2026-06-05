@@ -4,30 +4,27 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
 
-  const loginScreen = $('#login-screen');
-  const appHeader = $('#app-header');
-  const appMain = $('#app-main');
   const searchForm = $('#search-form');
   const searchInput = $('#search-input');
   const filterCategory = $('#filter-category');
-  const filterQuality = $('#filter-quality');
+  const filterSize = $('#filter-size');
   const filterSort = $('#filter-sort');
-  const filterOrder = $('#filter-order');
   const resultsSection = $('#results-section');
   const resultsGrid = $('#results-grid');
   const resultsTitle = $('#results-title');
   const resultsCount = $('#results-count');
   const loadingSection = $('#loading-section');
+  const loadingText = $('#loading-text');
   const emptySection = $('#empty-section');
   const errorSection = $('#error-section');
-  const errorTitle = $('#error-title');
   const errorMessage = $('#error-message');
   const pagination = $('#pagination');
-  const debridModal = $('#debrid-modal');
   const debridProgressModal = $('#debrid-progress-modal');
-  const debridApiKeyInput = $('#debrid-api-key');
-  const debridStatusDot = $('#debrid-status-dot');
-  const keyStatus = $('#key-status');
+  const loginService = $('#login-service');
+  const loginApiKey = $('#login-api-key');
+  const btnSaveKey = $('#btn-save-key');
+  const btnPasteKey = $('#btn-paste-key');
+  const keyStatusText = $('#key-status-text');
   const toastContainer = $('#toast-container');
 
   let currentQuery = '';
@@ -81,80 +78,74 @@
 
   function init() {
     const config = getConfig();
-    if (config.service && config.key) {
-      enterApp(true);
-    } else if (localStorage.getItem('skip_login') === 'true') {
-      enterApp(false);
+    if (config.service) loginService.value = config.service;
+    if (config.key) {
+      loginApiKey.value = config.key;
+      isLoggedIn = true;
+      updateDebridStatus();
     }
     bindEvents();
-  }
-
-  function enterApp(loggedIn) {
-    isLoggedIn = loggedIn;
-    loginScreen.classList.add('hidden');
-    appHeader.classList.remove('hidden');
-    appMain.classList.remove('hidden');
-    updateDebridStatus();
     searchInput.focus();
   }
 
   function bindEvents() {
-    $('#btn-login-paste').addEventListener('click', async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        $('#login-api-key').value = text.trim();
-        toast('Pasted from clipboard', 'success');
-      } catch { toast('Cannot read clipboard. Paste manually.', 'error'); }
-    });
+    if (btnPasteKey) {
+      btnPasteKey.addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          loginApiKey.value = text;
+          toast('Pasted from clipboard', 'info');
+        } catch (err) {
+          toast('Failed to read clipboard', 'error');
+        }
+      });
+    }
 
-    $('#btn-login-submit').addEventListener('click', () => {
-      const service = $('#login-service').value;
-      const key = $('#login-api-key').value.trim();
+    btnSaveKey.addEventListener('click', async () => {
+      const service = loginService.value;
+      const key = loginApiKey.value.trim();
       if (!key) { toast('Please enter an API key', 'error'); return; }
-      saveConfig(service, key);
-      localStorage.removeItem('skip_login');
-      enterApp(true);
-      toast(`Connected to ${DEBRID_SERVICES[service].name}!`, 'success');
-    });
 
-    $('#btn-login-skip').addEventListener('click', () => {
-      localStorage.setItem('skip_login', 'true');
-      enterApp(false);
+      keyStatusText.textContent = 'Validating key...';
+      keyStatusText.style.color = 'var(--text-muted)';
+      btnSaveKey.disabled = true;
+
+      try {
+        let isValid = false;
+        if (service === 'torbox') {
+          const res = await fetch('/api/torbox', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getUser', key })
+          });
+          const data = await res.json();
+          isValid = res.ok && data.success !== false;
+        } else {
+          isValid = true;
+        }
+
+        if (!isValid) throw new Error('Invalid API key');
+
+        saveConfig(service, key);
+        isLoggedIn = true;
+        updateDebridStatus();
+        toast(`Connected to ${DEBRID_SERVICES[service].name}!`, 'success');
+      } catch (err) {
+        keyStatusText.textContent = 'Invalid API key';
+        keyStatusText.style.color = 'var(--danger)';
+        toast(err.message || 'Validation failed', 'error');
+      } finally {
+        btnSaveKey.disabled = false;
+      }
     });
 
     searchForm.addEventListener('submit', handleSearch);
-    $('#btn-retry').addEventListener('click', () => doSearch(currentQuery, currentPage));
-
-    $('#logo').addEventListener('click', () => {
-      showSection(null);
-      searchInput.value = '';
-      searchInput.focus();
-    });
-
-    $('#btn-debrid-settings').addEventListener('click', openDebridModal);
-    $('#btn-close-modal').addEventListener('click', closeDebridModal);
-    debridModal.querySelector('.modal-backdrop').addEventListener('click', closeDebridModal);
-    $('#btn-paste-key').addEventListener('click', pasteApiKey);
-    $('#btn-save-key').addEventListener('click', saveDebridKeyFromModal);
-    $('#btn-clear-key').addEventListener('click', clearDebridKey);
-    $('#btn-test-key').addEventListener('click', testDebridKey);
-
-    $('#btn-logout').addEventListener('click', () => {
-      clearConfig();
-      localStorage.removeItem('skip_login');
-      isLoggedIn = false;
-      loginScreen.classList.remove('hidden');
-      appHeader.classList.add('hidden');
-      appMain.classList.add('hidden');
-      showSection(null);
-      toast('Logged out', 'info');
-    });
 
     $('#btn-close-progress').addEventListener('click', closeProgressModal);
     debridProgressModal.querySelector('.modal-backdrop').addEventListener('click', closeProgressModal);
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { closeDebridModal(); closeProgressModal(); }
+      if (e.key === 'Escape') { closeProgressModal(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); searchInput.focus(); searchInput.select(); }
     });
   }
@@ -174,9 +165,17 @@
     showSection('loading');
 
     try {
-      const params = new URLSearchParams({ q: query, c: filterCategory.value, f: filterQuality.value, page: String(page) });
-      if (filterSort.value) params.set('s', filterSort.value);
-      if (filterOrder.value) params.set('o', filterOrder.value);
+      const params = new URLSearchParams({ q: query, c: filterCategory.value, page: String(page) });
+      if (filterSize.value && filterSize.value !== '0') params.set('maxSize', filterSize.value);
+      if (filterSort && filterSort.value) {
+        const [s, o] = filterSort.value.split(':');
+        params.set('s', s);
+        params.set('o', o);
+      }
+
+      loadingText.textContent = 'Connecting to server...';
+      setTimeout(() => { if (isSearching) loadingText.textContent = 'Fetching results...'; }, 800);
+      setTimeout(() => { if (isSearching) loadingText.textContent = 'Parsing data...'; }, 2000);
 
       const res = await fetch(`/api/search?${params.toString()}`);
       if (!res.ok) {
@@ -191,7 +190,6 @@
       showSection('results');
       currentPage = page;
     } catch (err) {
-      errorTitle.textContent = 'Search Failed';
       errorMessage.textContent = err.message || 'Please check your connection and try again.';
       showSection('error');
     } finally {
@@ -217,8 +215,17 @@
     const dateStr = item.date ? formatDate(item.date) : '';
     const nyaaLink = item.id ? `https://nyaa.si/view/${item.id}` : '#';
 
-    const lockedClass = isLoggedIn ? '' : 'btn--locked';
+    const lockedClass = isLoggedIn ? '' : 'hidden';
     const lockedTitle = isLoggedIn ? '' : 'Login with a debrid key to unlock';
+
+    const qualities = ['2160p', '4k', '1080p', '720p', '480p'];
+    let qualityBadge = '';
+    for (const q of qualities) {
+      if (item.title.toLowerCase().includes(q)) {
+        qualityBadge = `<span class="badge badge-quality">${q.toUpperCase()}</span>`;
+        break;
+      }
+    }
 
     card.innerHTML = `
       <div class="card-top">
@@ -226,21 +233,22 @@
           <a href="${escapeHtml(nyaaLink)}" target="_blank" rel="noopener" title="View on Nyaa">${escapeHtml(item.title)}</a>
         </div>
         <div class="card-badges">
-          ${item.isTrusted ? '<span class="badge badge--trusted">✓ Trusted</span>' : ''}
-          ${item.isRemake ? '<span class="badge badge--remake">Remake</span>' : ''}
-          <span class="badge badge--category">${escapeHtml(item.category)}</span>
+          ${item.isTrusted ? '<span class="badge badge-trusted">✓ Trusted</span>' : ''}
+          ${item.isRemake ? '<span class="badge badge-remake">Remake</span>' : ''}
+          <span class="badge badge-category">${escapeHtml(item.category)}</span>
+          ${qualityBadge}
         </div>
       </div>
       <div class="card-meta">
-        <span class="meta-item meta-item--size" title="File size">
+        <span class="meta-item meta-item-size" title="File size">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
           ${escapeHtml(item.size)}
         </span>
-        <span class="meta-item meta-item--seeders" title="Seeders">
+        <span class="meta-item meta-item-seeders" title="Seeders">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
           ${item.seeders}
         </span>
-        <span class="meta-item meta-item--leechers" title="Leechers">
+        <span class="meta-item meta-item-leechers" title="Leechers">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           ${item.leechers}
         </span>
@@ -254,19 +262,19 @@
         </span>
       </div>
       <div class="card-actions">
-        <button class="btn btn--sm btn--ghost btn--magnet" data-action="copy-magnet" title="Copy magnet link">
+        <button class="btn btn-sm btn-outline btn-magnet" data-action="copy-magnet" title="Copy magnet link">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copy Magnet
         </button>
-        <button class="btn btn--sm btn--ghost btn--player ${lockedClass}" data-action="open-player" title="${lockedTitle || 'Open magnet in Stremio / Nuvio'}">
+        <button class="btn btn-sm btn-outline btn-player ${lockedClass}" data-action="open-player" title="${lockedTitle || 'Open magnet in Stremio / Nuvio'}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           Stremio / Nuvio
         </button>
-        <button class="btn btn--sm btn--ghost btn--vlc ${lockedClass}" data-action="stream-debrid" title="${lockedTitle || 'Stream via Debrid → VLC'}">
+        <button class="btn btn-sm btn-outline btn-vlc ${lockedClass}" data-action="stream-debrid" title="${lockedTitle || 'Stream via Debrid → VLC'}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 19h20L12 2z"/></svg>
           VLC (Debrid)
         </button>
-        <button class="btn btn--sm btn--ghost btn--download ${lockedClass}" data-action="download-debrid" title="${lockedTitle || 'Get direct download link via Debrid'}">
+        <button class="btn btn-sm btn-outline btn-download ${lockedClass}" data-action="download-debrid" title="${lockedTitle || 'Get direct download link via Debrid'}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download
         </button>
@@ -290,7 +298,7 @@
 
     if (currentPage > 1) {
       const prevBtn = document.createElement('button');
-      prevBtn.className = 'btn btn--outline btn--sm';
+      prevBtn.className = 'btn btn-outline btn-sm';
       prevBtn.textContent = '← Previous';
       prevBtn.addEventListener('click', () => doSearch(currentQuery, currentPage - 1));
       pagination.appendChild(prevBtn);
@@ -303,7 +311,7 @@
 
     if (hasMore) {
       const nextBtn = document.createElement('button');
-      nextBtn.className = 'btn btn--outline btn--sm';
+      nextBtn.className = 'btn btn-outline btn-sm';
       nextBtn.textContent = 'Next →';
       nextBtn.addEventListener('click', () => doSearch(currentQuery, currentPage + 1));
       pagination.appendChild(nextBtn);
@@ -324,7 +332,8 @@
 
     switch (action) {
       case 'open-player':
-        window.open(item.magnet, '_blank');
+        const stremioUrl = item.magnet.replace(/^magnet:\?/, 'stremio://');
+        window.open(stremioUrl, '_blank');
         toast('Opening in Stremio / Nuvio...', 'info');
         break;
       case 'stream-debrid':
@@ -339,8 +348,7 @@
   async function handleDebridStream(item, mode) {
     const config = getConfig();
     if (!config.service || !config.key) {
-      toast('Please configure your debrid service first', 'error');
-      openDebridModal();
+      toast('Please configure your debrid service in the settings panel above', 'error');
       return;
     }
 
@@ -412,7 +420,7 @@
       info = await infoRes.json();
       if (info.status === 'downloaded') break;
       if (['magnet_error', 'error', 'dead', 'virus'].includes(info.status)) throw new Error(`Torrent status: ${info.status}`);
-      setStepState('wait', 'active', info.progress ? `${info.progress}%` : 'Processing...');
+      setStepState('wait', 'active', info.progress ? `Downloading: ${info.progress}%` : 'Processing...');
       await sleep(2000);
     }
     if (!info || info.status !== 'downloaded') throw new Error('Timed out waiting for download');
@@ -613,7 +621,7 @@
       if (status === 'error' || status === 'dead') throw new Error(`Torrent ${status}`);
 
       const progress = torrent.progress
-        ? `${Math.round(torrent.progress * 100)}%`
+        ? `Downloading: ${Math.round(torrent.progress * 100)}%`
         : (torrent.download_state || 'Processing...');
       setStepState('wait', 'active', progress);
       await sleep(2000);
@@ -701,100 +709,14 @@
   function updateDebridStatus() {
     const config = getConfig();
     const hasKey = !!(config.service && config.key);
-    debridStatusDot.className = hasKey ? 'status-dot status-dot--active' : 'status-dot status-dot--inactive';
     const serviceName = hasKey ? DEBRID_SERVICES[config.service]?.name : '';
-    keyStatus.innerHTML = hasKey
-      ? `<span class="status-dot status-dot--active"></span><span>Connected to ${serviceName}</span>`
-      : '<span class="status-dot status-dot--inactive"></span><span>No API key configured</span>';
+    keyStatusText.textContent = hasKey
+      ? `Connected to ${serviceName}`
+      : 'No API key configured';
+    keyStatusText.style.color = hasKey ? 'var(--success)' : 'var(--text-muted)';
   }
 
-  function openDebridModal() {
-    debridModal.classList.remove('hidden');
-    const config = getConfig();
-    if (config.service) $('#settings-service').value = config.service;
-    debridApiKeyInput.value = config.key;
-  }
 
-  function closeDebridModal() { debridModal.classList.add('hidden'); }
-
-  async function pasteApiKey() {
-    try {
-      const text = await navigator.clipboard.readText();
-      debridApiKeyInput.value = text.trim();
-      toast('Pasted from clipboard', 'success');
-    } catch { toast('Cannot read clipboard. Paste manually.', 'error'); }
-  }
-
-  function saveDebridKeyFromModal() {
-    const service = $('#settings-service').value;
-    const key = debridApiKeyInput.value.trim();
-    if (!key) { toast('Please enter an API key', 'error'); return; }
-    saveConfig(service, key);
-    isLoggedIn = true;
-    updateDebridStatus();
-    toast(`Saved! Connected to ${DEBRID_SERVICES[service].name}`, 'success');
-    closeDebridModal();
-  }
-
-  function clearDebridKey() {
-    clearConfig();
-    debridApiKeyInput.value = '';
-    isLoggedIn = false;
-    updateDebridStatus();
-    toast('API key cleared', 'info');
-  }
-
-  async function testDebridKey() {
-    const service = $('#settings-service').value;
-    const key = debridApiKeyInput.value.trim() || getConfig().key;
-    if (!key) { toast('No API key to test', 'error'); return; }
-
-    try {
-      let res;
-      switch (service) {
-        case 'realdebrid':
-          res = await fetch('https://api.real-debrid.com/rest/1.0/user', { headers: { 'Authorization': `Bearer ${key}` } });
-          if (!res.ok) throw new Error('Invalid key');
-          const rdUser = await res.json();
-          toast(`Connected! Welcome, ${rdUser.username}`, 'success');
-          break;
-        case 'alldebrid':
-          res = await fetch(`https://api.alldebrid.com/v4/user?apikey=${encodeURIComponent(key)}&agent=AnimeLookup`);
-          if (!res.ok) throw new Error('Invalid key');
-          const adData = await res.json();
-          if (adData.status !== 'success') throw new Error('Invalid key');
-          toast(`Connected! Welcome, ${adData.data?.user?.username || 'user'}`, 'success');
-          break;
-        case 'premiumize':
-          res = await fetch(`https://www.premiumize.me/api/account/info?apikey=${encodeURIComponent(key)}`);
-          if (!res.ok) throw new Error('Invalid key');
-          const pmData = await res.json();
-          toast(`Connected! Customer #${pmData.customer_id || 'unknown'}`, 'success');
-          break;
-        case 'torbox': {
-          const tbRes = await fetch('/api/torbox', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'getUser', key }),
-          });
-          if (!tbRes.ok) throw new Error('Invalid key');
-          const tbData = await tbRes.json();
-          toast(`Connected! Welcome, ${tbData.data?.email || 'TorBox user'}`, 'success');
-          break;
-        }
-        default:
-          toast('Test not available for this service yet', 'info');
-          break;
-      }
-
-      saveConfig(service, key);
-      debridApiKeyInput.value = key;
-      isLoggedIn = true;
-      updateDebridStatus();
-    } catch (err) {
-      toast('API key invalid or connection failed', 'error');
-    }
-  }
 
   function openProgressModal() { debridProgressModal.classList.remove('hidden'); }
   function closeProgressModal() { debridProgressModal.classList.add('hidden'); }

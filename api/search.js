@@ -27,16 +27,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { q = '', c = '0_0', f = '0', page = '1', s = '', o = '' } = req.query;
+    const { q = '', c = '0_0', f = '0', page = '1', s = '', o = '', maxSize = '0' } = req.query;
 
     if (!q.trim()) {
       return res.json({ results: [], total: 0 });
     }
 
+    // Fuzzy search: replace special characters with spaces for a broader match
+    let searchQ = q.trim().replace(/[\[\]\(\)\-\_\+\.\,]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!searchQ) searchQ = q.trim();
+
 
     const params = new URLSearchParams({
       page: 'rss',
-      q: q.trim(),
+      q: searchQ,
       c,
       f,
     });
@@ -123,6 +127,12 @@ export default async function handler(req, res) {
       };
     });
 
+    if (maxSize && maxSize !== '0') {
+      const maxBytes = parseInt(maxSize, 10);
+      if (!isNaN(maxBytes) && maxBytes > 0) {
+        results = results.filter(r => r.sizeBytes <= maxBytes);
+      }
+    }
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
 

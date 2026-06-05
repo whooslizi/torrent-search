@@ -45,6 +45,7 @@ export default async function handler(req, res) {
         break;
       }
 
+      // ── Request download link ──────────────────────────────────
       case 'requestDl': {
         const url = new URL(`${TORBOX_BASE}/torrents/requestdl`);
         url.searchParams.set('token', key);
@@ -56,6 +57,8 @@ export default async function handler(req, res) {
         if (!resp.ok) throw new Error(result.detail || result.error || `TorBox error ${resp.status}`);
         break;
       }
+
+      // ── Get user info (for testing key) ────────────────────────
       case 'getUser': {
         const resp = await fetch(`${TORBOX_BASE}/user/me`, { headers });
         result = await resp.json();
