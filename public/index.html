@@ -12,40 +12,15 @@
 </head>
 <body>
   <main class="app-container">
-    <header class="app-header">
+    <header class="app-header" style="position: relative;">
       <h1>Anime <span class="accent">Lookup</span></h1>
       <p class="subtitle">Search and stream via debrid seamlessly.</p>
+      <button id="btn-open-settings" class="btn btn-icon" style="position: absolute; top: 0; right: 0; font-size: 1.25rem;" title="Settings">
+        ⚙️
+      </button>
     </header>
 
-    <div class="card api-card">
-      <div class="card-header">
-        <h2>Debrid Configuration</h2>
-      </div>
-      <div class="card-body form-row">
-        <div class="form-group service-select-group">
-          <label>Service</label>
-          <select id="login-service">
-            <option value="realdebrid">Real-Debrid</option>
-            <option value="alldebrid">AllDebrid</option>
-            <option value="premiumize">Premiumize</option>
-            <option value="debridlink">Debrid-Link</option>
-            <option value="torbox" selected>TorBox</option>
-          </select>
-        </div>
-        <div class="form-group key-input-group">
-          <label>API Key</label>
-          <div class="input-with-button">
-            <input type="password" id="login-api-key" placeholder="Paste your API key here">
-            <button id="btn-paste-key" class="btn btn-outline" type="button">Paste</button>
-            <button id="btn-save-key" class="btn btn-primary">Save</button>
-          </div>
-          <small class="disclaimer" style="color: var(--text-muted); font-size: 0.7rem; margin-top: 4px; display: block;">* We do not store your API key on our server. It is saved only in your browser.</small>
-        </div>
-      </div>
-      <div class="api-status">
-        <span id="key-status-text">No API key configured</span>
-      </div>
-    </div>
+
 
     <div class="card search-card">
       <div class="card-header">
@@ -136,6 +111,41 @@
           <div class="progress-step" data-step="unrestrict"><span>4. Generating links</span> <span class="step-status"></span></div>
         </div>
         <div id="debrid-links" class="debrid-links hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Debrid Configuration</h2>
+        <button id="btn-close-settings" class="btn btn-icon">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <div class="form-group service-select-group" style="margin-bottom: 16px;">
+          <label>Service</label>
+          <select id="login-service">
+            <option value="realdebrid">Real-Debrid</option>
+            <option value="alldebrid">AllDebrid</option>
+            <option value="premiumize">Premiumize</option>
+            <option value="debridlink">Debrid-Link</option>
+            <option value="torbox" selected>TorBox</option>
+          </select>
+        </div>
+        <div class="form-group key-input-group">
+          <label>API Key</label>
+          <div class="input-with-button">
+            <input type="password" id="login-api-key" placeholder="Paste your API key here">
+            <button id="btn-paste-key" class="btn btn-outline" type="button">Paste</button>
+            <button id="btn-save-key" class="btn btn-primary">Save</button>
+          </div>
+          <small class="disclaimer" style="color: var(--text-muted); font-size: 0.7rem; margin-top: 4px; display: block;">* <b>I</b> do not store your API key on our server. It is saved only in your browser.</small>
+        </div>
+        <div class="api-status" style="margin-top: 16px; text-align: left; padding: 0; border: none; background: transparent;">
+          <span id="key-status-text">No API key configured</span>
+        </div>
       </div>
     </div>
   </div>
