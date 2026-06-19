@@ -633,16 +633,16 @@
       if (!torrent) throw new Error('Torrent not found');
 
       const status = torrent.download_state;
-      if (status === 'completed' || status === 'cached' || status === 'uploading') break;
+      if (['completed', 'cached', 'uploading', 'downloading'].includes(status)) break;
       if (status === 'error' || status === 'dead') throw new Error(`Torrent ${status}`);
 
       const progress = torrent.progress
-        ? `Downloading: ${Math.round(torrent.progress * 100)}%`
+        ? `Fetching metadata: ${Math.round(torrent.progress * 100)}%`
         : (torrent.download_state || 'Processing...');
       setStepState('wait', 'active', progress);
       await sleep(2000);
     }
-    if (!torrent || !['completed', 'cached', 'uploading'].includes(torrent.download_state)) {
+    if (!torrent || !['completed', 'cached', 'uploading', 'downloading'].includes(torrent.download_state)) {
       throw new Error('Timed out waiting for TorBox download');
     }
     setStepState('wait', 'done', 'Ready ✓');
@@ -709,17 +709,8 @@
   }
 
   function openInVLC(url, filename) {
-    const m3uContent = `#EXTM3U\n#EXTINF:-1,${filename || 'Stream'}\n${url}`;
-    const blob = new Blob([m3uContent], { type: 'audio/x-mpegurl' });
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = `${(filename || 'stream').replace(/[^a-zA-Z0-9._-]/g, '_')}.m3u`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
-    toast('Opening .m3u in VLC...', 'info');
+    copyToClipboard(url);
+    toast('Stream link copied! Paste it into VLC.', 'success');
   }
 
   function updateDebridStatus() {
